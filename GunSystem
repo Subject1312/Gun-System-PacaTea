@@ -1,0 +1,740 @@
+--CREATED BY PACATEA [SWORDGEAR STUDIOS]
+--IF YOU HAVE RECIEVED A COPY OF THIS GUNSYSTEM, YOU MUST CREDIT MY WORK
+
+--               ____________        _____________        _____________     _____________         ________________         ______________          _______________
+--               |          |        |           |       |                  |           |                |                |                        |             |
+--               |          |        |           |       |                  |           |                |                |                        |             |
+--               |          |        |           |       |                  |           |                |                |                        |             |
+--               |__________|        |___________|       |                  |___________|                |                |______________          |_____________|
+--               |                   |           |       |                  |           |                |                |                        |             |
+--               |                   |           |       |                  |           |                |                |                        |             |
+--               |                   |           |       |______________    |           |                |                |______________          |             |
+
+local tool = script.Parent
+
+---------------------PLAYER  RELATED-----------------------------------------------------------
+
+
+local plr = game.Players.LocalPlayer
+
+plr.CharacterAppearanceLoaded:Wait()                     -- The player Must be loaded before starting anything
+
+local char = plr.Character
+
+---------------------CFRAME  RELATED------------------------------------------------------------
+
+local Information = require(game.ReplicatedStorage.InformationOnAnything)
+
+local offset = script:WaitForChild("Offset")            -- Reload Function
+
+local recoil = require(game.ReplicatedStorage.SpringModule)
+local newrecoil = recoil.new(2)
+
+-----------------------------------------------------------------------------------------------
+
+local Crosshair = plr.PlayerGui.MainFrame.Wholescreen.MainAim
+
+local weld = tool:WaitForChild("Important").Attach
+
+local Setting = require(script.Parent.Setting)
+
+local UIS = game:GetService("UserInputService")
+
+local Mouse = plr:GetMouse()
+
+local function ColornchangeArms(LeftArm,RightArm,CHARBODY)
+
+	LeftArm.Color = char:FindFirstChild("Left Arm").Color
+	RightArm.Color = char:FindFirstChild("Right Arm").Color
+	
+	char:FindFirstChild("Shirt"):Clone().Parent = CHARBODY
+	
+end
+
+local AnimationsR6 = {
+	Equip = char:WaitForChild("Humanoid"):LoadAnimation(tool.Animations.EquipFirst);
+	EquipSecond = char:WaitForChild("Humanoid"):LoadAnimation(tool.Animations.EquipSecond);
+	Idle = char:WaitForChild("Humanoid"):LoadAnimation(tool.Animations.Idle);
+	AimingIdle = char:WaitForChild("Humanoid"):LoadAnimation(tool.Animations.AimingIdle);
+	Shoot = char:WaitForChild("Humanoid"):LoadAnimation(tool.Animations.Shoot);
+	AimingShoot = char:WaitForChild("Humanoid"):LoadAnimation(tool.Animations.AimingShoot);
+	Inspect = char:WaitForChild("Humanoid"):LoadAnimation(tool.Animations.Inspect);
+	Selector = char:WaitForChild("Humanoid"):LoadAnimation(tool.Animations.Selector);
+}
+
+
+local function onFirstPersonChanged(val,VMPARMS)
+	if val == true then
+		if Setting.Equipped == true then
+			for i,v in pairs(VMPARMS:GetDescendants()) do
+				if v:IsA("Part") or v:IsA("MeshPart") then
+					if v.Name ~= "FakeCamera" then
+						if v.Name ~= "HumanoidRootPart" then
+							if v.Name ~= "Torso" then
+								if v.Name ~= "Mainpart" then
+									if v.Name ~= "MuzzlePoint" then
+										v.Transparency = 0		
+									end
+								end
+							end
+						end
+					end
+				end
+				
+				if v.Name == "ReticleDe" then
+					v.Transparency = 1
+					v.Decal.Transparency = 0
+				end
+			end
+			for i,_v in pairs(script.Parent.M4A1:GetChildren()) do
+				_v.Transparency = 1
+				
+				if string.find(_v.Name,"Optic") then
+					_v.ReticleDe.Decal.Transparency = 1
+				end
+			end
+		end
+	elseif val == false then
+		
+		for i,v in pairs(VMPARMS:GetDescendants()) do -- This function is to change the visibilty [by transparency] of both the 3RDPERSON Model and VIEWMODEL,
+			if v:IsA("Part") or v:IsA("MeshPart") then  -- Once the give runservice detects the change of the players camera was switched to either third person or first,   
+				if v.Name ~= "FakeCamera" then            -- It will check and give the required setting
+					if v.Name ~= "HumanoidRootPart" then
+						if v.Name ~= "Mainpart" then
+							if v.Name ~= "Muzzlepoint" then
+								v.Transparency = 1
+							end
+						end
+					end
+				end
+			end
+			
+			if v.Name == "ReticleDe" then
+				v.Decal.Transparency = 1
+			end
+		end
+		for i,_v in pairs(script.Parent.M4A1:GetChildren()) do
+			if _v.Name ~= "Mainpart" then
+				if _v.Name ~= "Muzzlepoint" then
+					
+					_v.Transparency = 0
+				end
+			end
+			
+			if string.find(_v.Name,"Optic") then
+				_v.ReticleDe.Decal.Transparency = 0
+			end
+		end
+	end
+end
+
+local OLDLS = char.Torso["Left Shoulder"].C0  -- These Variable is to Reset the Players Arms/grip back to square 1 once the player unequips or dies with the gun at hand.
+local OLDRS = char.Torso["Right Shoulder"].C0
+local OLDT = char.Torso.Grip.C0
+
+local PLAYERSETTINGS = plr:WaitForChild("PlayerInfo")
+
+local TS = game:GetService("TweenService")
+
+local ISFC = false
+local RSCR = false
+local canrunlikethat = true
+local AlreadyChanged = false  -- Here are the "Debounces"
+local allowed = true
+local MovingSideWaysChanged = {
+	Left = false;
+	Right = false
+}
+
+local camera = game.Workspace.CurrentCamera
+local isFirstPerson = (camera.CFrame.p - camera.Focus.p).magnitude < 0.75 -- This is formula that needs to be used to determine the visibilty of the weapon
+
+local function UpdateGUI(guiframe)
+	guiframe.Ammo.TextA.Text = Setting.AmmoCurrent
+	guiframe.LeftoverAmmo.TextA.Text = Setting.AmmoLeft  -- And Finally these are the the UI's Text Labels that change once the function is called
+end
+
+script.Parent.Equipped:Connect(function()
+	
+	local guiframe = script.GUNFrame:Clone()
+	guiframe.Parent = plr.PlayerGui.MainFrame.Wholescreen -- This is Gun UI, Whichs shows the Ammo, Bullet Type and Tool Name.
+	guiframe.Name = tool.Name.."Frame"
+
+	--INFO
+	guiframe.AmmoTypeText.Text = tool.Important.AmmoOptions.Value
+	guiframe.ToolName.Text = tool.Name
+	guiframe.Ammo.TextA.Text = Setting.AmmoCurrent
+	guiframe.LeftoverAmmo.TextA.Text = Setting.AmmoLeft               -- If the player had re equipped the gun, it would make all these texts into the present sense
+	guiframe.AmmoTypeImage.Image = Information.AmmoType(".50CAL")
+	guiframe.Gun.Image = Setting.IMAGE
+
+	TS:Create(guiframe,TweenInfo.new(0.5,Enum.EasingStyle.Quart,Enum.EasingDirection.InOut),{Position = UDim2.new(0.86, 0,0.748, 0)}):Play()-- Animation to move it in
+	--
+
+	if Setting.AmmoCurrent <= 2 then
+		if Setting.AmmoLeft == 0 then
+			if not Crosshair:FindFirstChild("Empty") then
+				local rel = script.Empty:Clone()
+				rel.Parent = Crosshair
+			end
+			if Crosshair:FindFirstChild("Reload") then
+				Crosshair:FindFirstChild("Reload"):Remove() -- A frame is given if the guns needs to be reloaded once after the guns been re equipped
+			end
+		else
+			if not Crosshair:FindFirstChild("Reload") then
+				local rel = script.Reload:Clone()
+				rel.Parent = Crosshair
+				rel.Name = "Reload"
+			end
+		end
+	end
+  
+  -- GUI --------------------------------------------------------------------
+
+	Setting.plr = plr
+	
+	local VMPARMS = Setting.VModel:Clone()
+  -[WILL NOT SHOW]-
+	VMPARMS.Parent = workspace
+	
+	local AnimationsVM = {
+		Equip = VMPARMS.Humanoid:LoadAnimation(tool.Animations.EquipFirst);
+		EquipSecond = VMPARMS.Humanoid:LoadAnimation(tool.Animations.EquipSecond);
+		Idle = VMPARMS.Humanoid:LoadAnimation(tool.Animations.Idle);
+		AimingIdle = VMPARMS.Humanoid:LoadAnimation(tool.Animations.AimingIdle);  -- All the guns animations are loaded
+		Shoot = VMPARMS.Humanoid:LoadAnimation(tool.Animations.Shoot);
+		Inspect = VMPARMS.Humanoid:LoadAnimation(tool.Animations.Inspect);
+		Selector = VMPARMS.Humanoid:LoadAnimation(tool.Animations.Selector);
+	}
+	
+  -[WILL NOT SHOW]-
+	
+	Setting.Equipped = true
+	
+	UIS.MouseIconEnabled = false
+	
+	
+	ColornchangeArms(VMPARMS:FindFirstChild("Left Arm"),VMPARMS:FindFirstChild("Right Arm"),VMPARMS)
+	
+	weld.Part0 = char:FindFirstChild("RightArm")
+	weld.Part1 = Setting.Mainpart
+	
+	game.ReplicatedStorage.ServerEvent.WeldOn:FireServer(Setting.Mainpart, "Torso")
+	
+	local SwayEffect = 0.75
+	local SwayCFrame = CFrame.new()
+	local LastCameraCFrame = CFrame.new()  -- All Of the CFrames that are required for the walk,run,aim and sway
+	local walkcf = CFrame.new()
+	local runcf = CFrame.new()
+	local aimcf = CFrame.new()
+	
+	local a = 0
+	local speed = 0.01
+	local radius = 0.5
+	
+	if Setting.alreadyequipped == false then
+		AnimationsR6.Equip:Play()
+		AnimationsVM.Equip:Play()
+	-[N/A]-.Equip:Play()
+	else                                              -- Plays Animation
+		AnimationsR6.EquipSecond:Play()
+		AnimationsVM.EquipSecond:Play()
+		-[N/A]-.Equip:Play()
+	end
+	
+	AnimationsVM.Equip:GetMarkerReachedSignal("Equipped1"):Connect(function()
+		AnimationsR6.Idle:Play()
+		AnimationsVM.Idle:Play()
+		Setting.alreadyequipped = true                                              -- When the marker is reached, It will automatically play the Idle animation
+	end)
+	
+	AnimationsVM.EquipSecond:GetMarkerReachedSignal("Equipped1"):Connect(function()
+		AnimationsR6.Idle:Play()
+		AnimationsVM.Idle:Play()
+	end)
+	game:GetService("RunService").RenderStepped:Connect(function(dt)
+		if ((camera.CFrame.p - camera.Focus.p).magnitude < 0.75) ~= isFirstPerson then
+		isFirstPerson =  (camera.CFrame.p - camera.Focus.p).magnitude < 0.75
+		onFirstPersonChanged(isFirstPerson,VMPARMS)                                -- Heres is when it checks if the players is in first person or not
+	else
+		isFirstPerson =  (camera.CFrame.p - camera.Focus.p).magnitude > 0.75
+		onFirstPersonChanged(isFirstPerson,VMPARMS)
+	end)
+	
+	
+	UIS.InputBegan:Connect(function(IN, IS)
+		if IS then return end
+
+		if IN.KeyCode == Enum.KeyCode[plr.PlayerChosenSettings.Keybinds.Inspect.Value] then -- Inspect Function
+			if Setting.Inspecting == false then
+				if Setting.Equipped == true then
+					Setting.Inspecting = true
+
+					AnimationsR6.Inspect:Play()                                                   -- UIS.InputBegan has most of the actions that you would do in a gun I.E 
+					AnimationsVM.Inspect:Play()                                                   -- Reloading, Inspecting and changing Selector, this is compact and easier for
+                                                                                            -- me
+					AnimationsR6.Inspect:GetMarkerReachedSignal("Finished"):Connect(function()
+						Setting.Inspecting = false
+					end)
+				end
+			end
+		elseif IN.KeyCode == Enum.KeyCode[plr.PlayerChosenSettings.Keybinds.Reload.Value] then  -- Reload Function
+			if Setting.Equipped == true then
+				if Setting.AmmoCurrent ~= 30 then
+					if Setting.AmmoLeft > 0 then
+
+						tool.Important.Reload:FireServer()
+
+						local mathcal = (30 - Setting.AmmoCurrent)
+
+						if Setting.AmmoLeft >= mathcal then
+							Setting.AmmoLeft -= mathcal
+							Setting.AmmoCurrent = 30
+						else
+							Setting.AmmoCurrent += Setting.AmmoLeft
+							Setting.AmmoLeft = 0
+						end
+
+						local check = Crosshair:FindFirstChild("Reload")
+
+						if check then
+							check:Remove()
+						end
+
+						UpdateGUI(guiframe)
+					end
+				end
+			end
+		elseif IN.KeyCode == Enum.KeyCode[plr.PlayerChosenSettings.Keybinds.SelectorChange.Value] then -- Selector Function
+			if Setting.Equipped == true then
+				AnimationsVM.Selector:Play()
+				AnimationsR6.Selector:Play()
+				
+				if Setting.Mode == "Semi" then
+					Setting.Mode = "Auto"
+					tool.Important.ModeSwitch:FireServer("Auto")
+				elseif Setting.Mode == "Auto" then
+					Setting.Mode = "Semi"
+					tool.Important.ModeSwitch:FireServer("Semi")
+				end	
+			end
+		end
+	end)
+	
+	Mouse.Button2Down:Connect(function()
+		if Setting.Equipped == true then
+			if Setting.Allowedtoaim == true then
+				game.ReplicatedStorage.PlayerEvent.Aiming:FireServer(true)
+				Setting.Aiming = true
+
+				Setting.Inspecting = false
+
+				AnimationsVM.Idle:Stop()                                       -- Here is the Aiming Script to scope in...
+			    AnimationsR6.Idle:Stop()				
+
+				AnimationsR6.Inspect:Stop()
+				AnimationsVM.Inspect:Stop()
+				-[N/A]-.Inspect:Stop()
+
+				AnimationsVM.AimingIdle:Play()
+			    AnimationsR6.AimingIdle:Play()
+
+				TS:Create(camera,TweenInfo.new(0.125,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{FieldOfView = plr.PlayerChosenSettings.Gameplay.FOVValue.Value - 15}):Play()
+
+				for i,framesincrosshair in pairs(Crosshair:GetChildren()) do
+					if framesincrosshair:IsA("Frame") then
+						if framesincrosshair.Name ~= "Reload" and framesincrosshair.Name ~= "Empty" then
+							TS:Create(framesincrosshair,TweenInfo.new(0.25,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut),{BackgroundTransparency = 1}):Play()
+							TS:Create(framesincrosshair.UIStroke,TweenInfo.new(0.25,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut),{Transparency = 1}):Play()
+						end
+					end
+				end
+			end
+		end
+	end)
+	Mouse.Button2Up:Connect(function()
+		game.ReplicatedStorage.PlayerEvent.Aiming:FireServer(false)
+		if Setting.Equipped == true then
+			if Setting.Aiming == true then
+				Setting.Aiming = false
+				
+
+				AnimationsVM.Idle:Play()
+				AnimationsR6.Idle:Play()
+
+				AnimationsVM.AimingIdle:Stop()
+				AnimationsR6.AimingIdle:Stop()                    -- ...And to scope out
+
+				TS:Create(camera,TweenInfo.new(0.125,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{FieldOfView = camera.FieldOfView + 15}):Play()
+
+				for i,framesincrosshair in pairs(Crosshair:GetChildren()) do
+					if framesincrosshair:IsA("Frame") then
+						if framesincrosshair.Name ~= "Reload" and framesincrosshair.Name ~= "Empty" then
+							TS:Create(framesincrosshair,TweenInfo.new(0.25,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut),{BackgroundTransparency = 0.1}):Play()
+							TS:Create(framesincrosshair.UIStroke,TweenInfo.new(0.25,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut),{Transparency = 0.7}):Play()
+						end
+					end
+				end
+			end
+		end
+	end)
+	
+	tool.Activated:Connect(function()                       -- This is the shoot function, which is in pace with the script that the event fires too, the local script
+                                                          -- does not do raycasting so that it can avoid exploiters
+		if Setting.Mode == "Semi" then
+			if Setting.Equipped == true then
+				if allowed == true then
+					if Setting.AmmoCurrent > 0 then
+						if Setting.Running == false then
+
+							allowed = false
+
+							AnimationsVM.Shoot:Play()
+						-[N/A]-.Shoot:Play()
+
+							if Setting.Aiming == true then
+								AnimationsR6.AimingShoot:Play()
+							else
+								AnimationsR6.Shoot:Play()
+							end
+
+							AnimationsVM.Idle:Stop()
+							AnimationsR6.Idle:Stop()
+
+							AnimationsVM.AimingIdle:Stop()
+							AnimationsR6.AimingIdle:Stop()
+
+							Setting.Inspecting = false
+							AnimationsR6.Inspect:Stop()
+							AnimationsVM.Inspect:Stop()
+							-[N/A]-.Inspect:Stop()
+
+							if Setting.Aiming == false then
+								for i,checkframes in pairs(Crosshair:GetChildren()) do
+									if checkframes:IsA("Frame") then
+										if checkframes.Name ~= "Reload" and checkframes.Name ~= "Empty" then
+											checkframes.BackgroundTransparency = 0.1
+											checkframes.UIStroke.Transparency = 0.7
+										end
+									end
+								end
+							end
+
+
+							Setting.AmmoCurrent -= 1
+
+							UpdateGUI(guiframe)                    -- Here is that function from before
+
+
+							if Setting.AmmoCurrent <= 2 then
+								if Setting.AmmoLeft == 0 then
+									if not Crosshair:FindFirstChild("Empty") then
+										local rel = script.Empty:Clone()
+										rel.Parent = Crosshair
+										rel.Name = "Empty"
+									end
+									if Crosshair:FindFirstChild("Reload") then
+										Crosshair:FindFirstChild("Reload"):Remove()
+									end
+								else
+									if not Crosshair:FindFirstChild("Reload") then
+										local rel = script.Reload:Clone()
+										rel.Parent = Crosshair
+										rel.Name = "Reload"
+									end
+								end
+							end
+
+
+							wait(0.15)
+
+							allowed = true
+
+							wait(0.15)
+
+
+							if Setting.Aiming == true then
+								AnimationsVM.AimingIdle:Play()
+								AnimationsR6.AimingIdle:Play()
+							else
+								AnimationsVM.Idle:Play()
+								AnimationsR6.Idle:Play()
+							end
+						end
+					end
+				end
+			end
+		end
+	end)
+	
+	Mouse.Button1Down:Connect(function()
+		if Setting.Mode == "Auto" then
+			if Setting.Equipped == true then
+				if allowed == true then
+					if Setting.AmmoCurrent > 0 then
+						if Setting.Running == false then
+							tool.Important.AutoShoot:FireServer()
+							local autoallowed = true
+							while autoallowed == true and Setting.AmmoCurrent > 0 do                 -- This works exactly like the one above but its mainly for auto firing instead
+								allowed = false                                                        -- of semi
+
+								AnimationsVM.Shoot:Play()
+								-[N/A]-.Shoot:Play()
+
+								if Setting.Aiming == true then
+									AnimationsR6.AimingShoot:Play()
+								else
+									AnimationsR6.Shoot:Play()
+								end
+
+								AnimationsVM.Idle:Stop()
+								AnimationsR6.Idle:Stop()
+
+								AnimationsVM.AimingIdle:Stop()
+								AnimationsR6.AimingIdle:Stop()
+
+								Setting.Inspecting = false
+								AnimationsR6.Inspect:Stop()
+								AnimationsVM.Inspect:Stop()
+								-[N/A]-.Inspect:Stop()
+
+								if Setting.Aiming == false then
+									for i,checkframes in pairs(Crosshair:GetChildren()) do
+										if checkframes:IsA("Frame") then
+											if checkframes.Name ~= "Reload" and checkframes.Name ~= "Empty" then
+												checkframes.BackgroundTransparency = 0.1
+												checkframes.UIStroke.Transparency = 0.7
+											end
+										end
+									end
+								end
+
+								Setting.AmmoCurrent -= 1
+
+								UpdateGUI(guiframe)
+
+								if Setting.AmmoCurrent <= 2 then
+									if Setting.AmmoLeft == 0 then
+										if not Crosshair:FindFirstChild("Empty") then
+											local rel = script.Empty:Clone()
+											rel.Parent = Crosshair
+											rel.Name = "Empty"
+										end
+										if Crosshair:FindFirstChild("Reload") then
+											Crosshair:FindFirstChild("Reload"):Remove()
+										end
+									else
+										if not Crosshair:FindFirstChild("Reload") then
+											local rel = script.Reload:Clone()
+											rel.Parent = Crosshair
+											rel.Name = "Reload"
+										end
+									end
+								end
+
+								Mouse.Button1Up:Connect(function()                    -- This turns off the Auto Firing, Although i havent made this part auto proof.
+									autoallowed = false
+									tool.Important.NoShoot:FireServer()
+									print("up")
+								end)
+
+								if Setting.Running then
+									autoallowed = false
+									tool.Important.NoShoot:FireServer()
+									
+								end
+								
+								wait(0.1)
+								
+								allowed = true
+								Mouse.Button1Up:Connect(function()
+									autoallowed = false
+									tool.Important.NoShoot:FireServer()
+									if Setting.Aiming == true then
+										AnimationsVM.AimingIdle:Play()
+										AnimationsR6.AimingIdle:Play()
+									else
+										AnimationsVM.Idle:Play()
+										AnimationsR6.Idle:Play()
+									end
+									print("up")
+								end)
+
+								if Setting.Running then
+									autoallowed = false
+									tool.Important.NoShoot:FireServer()
+
+									if Setting.Aiming == true then
+										AnimationsVM.AimingIdle:Play()
+										AnimationsR6.AimingIdle:Play()
+									else
+										AnimationsVM.Idle:Play()
+										AnimationsR6.Idle:Play()
+									end
+								end
+
+								if Setting.AmmoCurrent <= 0 then
+									if Setting.Aiming == true then
+										AnimationsVM.AimingIdle:Play()
+										AnimationsR6.AimingIdle:Play()
+									else
+										AnimationsVM.Idle:Play()
+										AnimationsR6.Idle:Play()
+									end
+								end
+
+							end
+						end
+					end
+				end
+			end	
+		end
+	end)
+	
+	tool.Unequipped:Connect(function()
+		for i,anims in pairs(-[N/A]-) do
+			anims:Stop()
+		end
+	end)
+	
+	script.Parent.Important.HitSound.OnClientEvent:Connect(function()
+		wait(.075)
+		local hitsound = script.Hit_Marker_03:Clone()
+
+		hitsound.Parent = tool.M4A1.Mainpart
+		hitsound:Play()
+
+		game.Debris:AddItem(hitsound,0.41)
+	end)
+	
+end)
+
+script.Parent.Unequipped:Connect(function()
+
+	
+	UIS.MouseIconEnabled = true
+
+	weld.Part0 = nil
+	weld.Part1 = nil
+	
+	game.ReplicatedStorage.ServerEvent.WeldOff:FireServer()
+	
+	tool.M4A1.Magazine.Transparency = 0
+	
+	AnimationsR6.Equip:Stop()
+	AnimationsR6.Idle:Stop()
+	AnimationsR6.Shoot:Stop()
+	
+	--tool.M4A1.Mainpart.Reload:Stop()
+	
+	--AnimationsR6.Reload:Stop()
+	Setting.Reloading = false
+	
+	AnimationsR6.Inspect:Stop()
+	Setting.Inspecting = false
+	
+	for i,anims in pairs(AnimationsR6) do
+		anims:Stop()
+	end
+	
+	for i,v in pairs(game.Workspace:GetChildren()) do
+		if v.Name == Setting.VMODEL then
+			game.Debris:AddItem(v,0)
+		end
+	end
+	
+	for i,frames in pairs(Crosshair:GetChildren()) do
+		if frames.Name == "Reload" then
+			frames:Remove()
+		elseif frames.Name == "Empty" then
+			frames:Remove()
+		end
+	end
+
+	for i,frames in pairs(plr.PlayerGui.MainFrame.Wholescreen:GetChildren()) do
+		if frames.Name == tool.Name.."Frame" then
+			frames:Remove()
+		end
+	end
+	
+	AlreadyChanged = false
+	
+	Setting.Equipped = false
+	Setting.Aiming = false
+	Setting.Sliding = false
+	
+	Setting.Mainpart.Transparency = 0
+	
+--	script.Parent.SKS.Mainpart.Transparency = 1
+	
+	Mouse.Icon = "rbxassetid://0"
+	
+	char.Torso["Left Shoulder"].C0 = OLDLS
+	char.Torso["Right Shoulder"].C0 = OLDRS
+	char.Torso.Grip.C0 = OLDT
+	
+	
+	tool.Important.MouseFollow:FireServer(char, OLDT ,OLDLS, OLDRS)
+	
+	if not plr.Character:FindFirstChildWhichIsA("Tool") then
+		game.ReplicatedStorage.PlayerEvent.Aiming:FireServer(false)
+	end
+end)
+
+char:WaitForChild("Humanoid").Died:Connect(function()
+
+	UIS.MouseIconEnabled = true
+
+
+	weld.Part0 = nil
+	weld.Part1 = nil
+
+	game.ReplicatedStorage.ServerEvent.WeldOff:FireServer()
+
+	--tool.M4A1.Magazine.Transparency = 0
+
+	AnimationsR6.Equip:Stop()
+	AnimationsR6.Idle:Stop()
+	AnimationsR6.Shoot:Stop()
+	
+	for i,frames in pairs(Crosshair:GetChildren()) do
+		if frames.Name == "Reload" then
+			frames:Remove()
+		elseif frames.Name == "Empty" then
+			frames:Remove()
+		end
+	end
+
+	for i,frames in pairs(plr.PlayerGui.MainFrame.Wholescreen:GetChildren()) do
+		if frames.Name == tool.Name.."Frame" then
+			frames:Remove()
+		end
+	end
+	
+--	tool.M4A1.Mainpart.Reload:Stop()
+
+	--AnimationsR6.Reload:Stop()
+	Setting.Reloading = false
+
+	AnimationsR6.Inspect:Stop()
+	Setting.Inspecting = false
+
+	for i,v in pairs(game.Workspace:GetChildren()) do
+		if v.Name == Setting.VMODEL then
+			game.Debris:AddItem(v,0)
+		end
+	end
+	
+	AlreadyChanged = false
+	Setting.Equipped = false
+	Setting.Sliding = false
+	Setting.Reloading = false
+
+	Setting.Mainpart.Transparency = 0
+
+	script.Parent.M4A1.Mainpart.Transparency = 1
+
+	Mouse.Icon = "rbxassetid://0"
+
+	tool.Important.MouseFollow:FireServer(char, OLDT ,OLDLS, OLDRS)
+end)
